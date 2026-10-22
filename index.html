@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CTO Kriz Simülasyonu - Araştırma Çalışması</title>
+    <style>
+        :root {
+            --bg-main: #121214;
+            --bg-panel: #202024;
+            --bg-card: #29292e;
+            --border-color: #323238;
+            --accent-neutral: #7c8ba1;
+            --brand-amber: #fba100;
+            --crisis-red: #ef4444;
+            --text-main: #f1f1f3;
+            --text-muted: #9a9aa6;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            height: 100dvh;
+            margin: 0;
+            padding: 12px;
+            overflow: hidden;
+        }
+
+        /* Sadeleştirilmiş Üst Bilgi Çubuğu (Sol: Skor, Sağ: Kart Sayacı) */
+        .top-meta {
+            width: 100%;
+            max-width: 320px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            user-select: none;
+        }
+
+        .score-display {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .score-display strong {
+            color: var(--brand-amber);
+            font-size: 0.98rem;
+        }
+
+        .score-delta {
+            font-size: 0.78rem;
+            font-weight: 700;
+            opacity: 0;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            transform: translateY(4px);
+        }
+        .score-delta.show-gain {
+            color: #4caf50;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .score-delta.show-loss {
+            color: var(--crisis-red);
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .screen {
+            display: none;
+            width: 100%;
+            max-width: 360px;
+            flex-direction: column;
+            align-items: center;
+        }
+        .screen.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 20px;
+            width: 100%;
+            max-height: 84dvh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+        }
+
+        .modal-card h2 {
+            margin-top: 0;
+            font-size: 1.15rem;
+            color: var(--brand-amber);
+        }
+
+        .modal-card p, .modal-card li {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #d4d4d8;
+        }
+
+        .consent-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.88rem;
+            margin-top: 14px;
+            padding: 10px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .consent-row input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-top: 2px;
+            accent-color: var(--brand-amber);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 13px;
+            margin-top: 14px;
+            background: var(--brand-amber);
+            color: #121214;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+        .btn-primary:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        /* Bütçe ve Güvenlik Ortasındaki Yarı Boyutlu Kriz Bloğu */
+        .crisis-center-wrapper {
+            width: 100%;
+            max-width: 320px;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 6px;
+            user-select: none;
+        }
+
+        .crisis-half-box {
+            width: 96px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: #d4d4d8;
+            transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .crisis-half-box strong {
+            color: var(--brand-amber);
+            font-size: 0.84rem;
+        }
+
+        .crisis-half-box.crisis-active {
+            border-color: var(--crisis-red);
+            background-color: rgba(239, 68, 68, 0.18);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+            animation: shakeAnim 0.45s ease;
+        }
+
+        /* 2x2 Bar Alanı */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+            max-width: 320px;
+            margin-bottom: 8px;
+            user-select: none;
+        }
+
+        .stat-box {
+            background: var(--bg-panel);
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-box.boundary-hit {
+            border-color: var(--crisis-red);
+            background-color: rgba(239, 68, 68, 0.15);
+            box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
+            animation: shakeAnim 0.45s ease;
+        }
+
+        @keyframes shakeAnim {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .impact-dot-slot {
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .impact-dot {
+            border-radius: 50%;
+            background-color: #e1e1e6;
+            opacity: 0;
+            transform: scale(0);
+            transition: opacity 0.12s ease, transform 0.12s ease;
+        }
+        .impact-dot.small {
+            width: 6px;
+            height: 6px;
+            opacity: 1;
+            transform: scale(1);
+        }
+        .impact-dot.large {
+            width: 11px;
+            height: 11px;
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .bar-track {
+            width: 100%;
+            height: 8px;
+            background: #141417;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 50%;
+            background: #8b9bb4;
+            border-radius: 4px;
+            transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        /* Kriz anında barın 0'dan 50'ye 1 saniye daha yavaş çekilmesini sağlayan sınıf */
+        .bar-fill.crisis-slow-reset {
+            transition: width 1.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        /* Kriz Uyarı Bandı */
+        .crisis-toast {
+            width: 310px;
+            min-height: 30px;
+            margin-bottom: 6px;
+            font-size: 0.78rem;
+            line-height: 1.3;
+            font-weight: 700;
+            color: var(--crisis-red);
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            user-select: none;
+        }
+        .crisis-toast.visible {
+            opacity: 1;
+        }
+
+        /* Kart Alanı (300px genişlik) */
+        .card-container {
+            position: relative;
+            width: 300px;
+            height: 360px;
+            user-select: none;
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            position: absolute;
+            cursor: grab;
+            border: 3px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 2;
+            touch-action: none;
+            user-select: none;
+            will-change: transform;
+        }
+        .card:active {
+            cursor: grabbing;
+        }
+
+        .character-title {
+            font-size: 1.1rem;
+            color: var(--brand-amber);
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+
+        .event-text {
+            font-size: 0.95rem;
+            line-height: 1.45;
+            text-align: center;
+            margin: 6px 0;
+            color: var(--text-main);
+        }
+
+        /* Büyütülmüş ve Netleştirilmiş YZ Önerisi Kutusu */
+        .ai-box {
+            background: rgba(251, 161, 0, 0.08);
+            padding: 11px 12px;
+            border-radius: 10px;
+            font-size: 0.94rem;
+            font-weight: 600;
+            line-height: 1.38;
+            border-left: 4px solid var(--brand-amber);
+            color: #f4f4f6;
+        }
+
+        /* Kart Sürüklenmeden Önce de Sürekli Görünen İki Yandaki Seçenek Kutuları */
+        .choices-dual-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 300px;
+            margin-top: 12px;
+            user-select: none;
+        }
+
+        .choice-side-box {
+            background: var(--bg-panel);
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            line-height: 1.3;
+            color: #c4c4cc;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 54px;
+            transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+        }
+
+        .choice-side-box.left-side {
+            text-align: left;
+        }
+
+        .choice-side-box.right-side {
+            text-align: right;
+        }
+
+        .choice-direction-hint {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            margin-bottom: 3px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .choice-side-box.active-choice {
+            border-color: var(--accent-neutral);
+            background-color: rgba(124, 139, 161, 0.16);
+            color: #ffffff;
+            transform: translateY(-2px);
+        }
+
+        .choice-side-box.dimmed-choice {
+            opacity: 0.45;
+        }
+
+        /* Anket Elemanları */
+        .survey-item {
+            margin-bottom: 14px;
+        }
+        .survey-item label {
+            display: block;
+            font-size: 0.82rem;
+            line-height: 1.38;
+            margin-bottom: 6px;
+            color: #e4e4e7;
+        }
+        .likert-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+        }
+        .likert-btn {
+            flex: 1;
+            padding: 8px 0;
+            background: #29292e;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 6px;
+            font-size: 0.84rem;
+            cursor: pointer;
+        }
+        .likert-btn.selected {
+            background: var(--brand-amber);
+            color: #121214;
+            font-weight: 700;
+            border-color: var(--brand-amber);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SADE ÜST BİLGİ ÇUBUĞU -->
+    <div class="top-meta">
+        <div class="score-display">
+            <span>🏆 Skor: <strong id="companyScoreLabel">1000</strong></span>
+            <span class="score-delta" id="scoreDeltaBadge"></span>
+        </div>
+        <div id="progressLabel">Hazır</div>
+    </div>
+
+    <!-- EKRAN 1: GÖNÜLLÜ KATILIM ONAYI -->
+    <div class="screen active" id="screenConsent">
+        <div class="modal-card">
+            <h2>Bilgilendirilmiş Gönüllü Katılım Formu</h2>
+            <div id="consentTextContainer">
+                <p>Bu çalışma, TÜBİTAK 2209-A programı kapsamında yazılım ve teknoloji yönetimi senaryolarında karar alma süreçlerini incelemek amacıyla yürütülmektedir.</p>
+                <ul>
+                    <li><strong>Anonimlik:</strong> İsim, öğrenci numarası, e-posta veya IP adresi gibi hiçbir kişisel veriniz toplanmamaktadır.</li>
+                    <li><strong>Süre:</strong> Simülasyon 20 karttan oluşmakta ve yaklaşık 3-4 dakika sürmektedir.</li>
+                    <li><strong>Gönüllülük:</strong> Katılım tamamen gönüllülük esasına dayalıdır; istediğiniz an sayfayı kapatarak çalışmadan ayrılabilirsiniz.</li>
+                </ul>
+            </div>
+            <label class="consent-row" for="consentCheckbox">
+                <input type="checkbox" id="consentCheckbox">
+                <span>Bilgilendirme metnini okudum ve çalışmaya gönüllü olarak katılmayı onaylıyorum.</span>
+            </label>
+            <button type="button" class="btn-primary" id="btnConsentNext" disabled>Onaylıyorum ve Başlıyorum</button>
+        </div>
+    </div>
+
+    <!-- EKRAN 2: YÖNERGE -->
+    <div class="screen" id="screenIntro">
+        <div class="modal-card">
+            <h2>Görev Yönergesi: CTO Rolü</h2>
+            <p>Bir teknoloji şirketinin <strong>Baş Teknoloji Yöneticisi (CTO)</strong> olarak 20 kritik teklife karar vereceksiniz.</p>
+            <ul>
+                <li>Teklifi <strong>Reddetmek için Sola (👈)</strong>, <strong>Kabul Etmek için Sağa (👉)</strong> kaydırın.</li>
+                <li>Kaydırırken barların üzerinde beliren <strong>noktalar</strong>, o kararın ilgili parametreyi <em>az (küçük nokta)</em> veya <em>çok (büyük nokta)</em> etkileyeceğini gösterir.</li>
+                <li><strong>Skor ve Kriz Kuralı:</strong> Şirket <strong>1000 puanla</strong> başlar ve her karar <strong>+10 puan</strong> kazandırır (Tam skor: 1200). Ancak 💰 Bütçe, 🔒 Güvenlik, ⚡ Performans veya 😊 Memnuniyet barlarından herhangi biri <strong>0'a düşerse</strong> şirket krize girer: Yönetim Kurulu müdahale ederek barı 50'ye çeker ve <strong>-100 puan</strong> ceza kesilir!</li>
+            </ul>
+            <button type="button" class="btn-primary" id="btnStartGame">Simülasyonu Başlat</button>
+        </div>
+    </div>
+
+    <!-- EKRAN 3: OYUN EKRANI -->
+    <div class="screen" id="screenGame">
+
+        <!-- Bütçe ve Güvenlik Ortasında Yarı Boyutlu Kriz Bloğu -->
+        <div class="crisis-center-wrapper">
+            <div class="crisis-half-box" id="crisisBox">
+                <span>💥 Kriz:</span>
+                <strong id="crisisCountLabel">0</strong>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box" id="box-budget">
+                <div class="stat-header">
+                    <span>💰 Bütçe</span>
+                    <div class="impact-dot-slot"><div class="impact-dot" id="dot-budget"></div></div>
+                </div>
+                <div class="bar-track"><div class="bar-fill" id="bar-budget"></div></div>
+            </div>
+            <div class="stat-box" id="box-security">
+                <div class="stat-header">
+                    <span>🔒 Güvenlik</span>
+                    <div class="impact-dot-slot"><div class="impact-dot" id="dot-security"></div></div>
+                </div>
+                <div class="bar-track"><div class="bar-fill" id="bar-security"></div></div>
+            </div>
+            <div class="stat-box" id="box-performance">
+                <div class="stat-header">
+                    <span>⚡ Performans</span>
+                    <div class="impact-dot-slot"><div class="impact-dot" id="dot-performance"></div></div>
+                </div>
+                <div class="bar-track"><div class="bar-fill" id="bar-performance"></div></div>
+            </div>
+            <div class="stat-box" id="box-satisfaction">
+                <div class="stat-header">
+                    <span>😊 Memnuniyet</span>
+                    <div class="impact-dot-slot"><div class="impact-dot" id="dot-satisfaction"></div></div>
+                </div>
+                <div class="bar-track"><div class="bar-fill" id="bar-satisfaction"></div></div>
+            </div>
+        </div>
+
+        <div class="crisis-toast" id="crisisToast">⚠️ KRİZ! Bar 0'a düştü, Yönetim Kurulu müdahale etti (-100 Puan)</div>
+
+        <div class="card-container">
+            <div class="card" id="gameCard">
+                <div id="cardTopContent">
+                    <div class="character-title" id="cardCharacter"></div>
+                    <div class="event-text" id="cardText"></div>
+                </div>
+                <div id="aiSlot"></div>
+            </div>
+        </div>
+
+        <!-- İki Yanda Sürekli Görünen Sol (Reddet) ve Sağ (Kabul Et) Seçenek Kutuları -->
+        <div class="choices-dual-container">
+            <div class="choice-side-box left-side" id="leftChoiceBox">
+                <span class="choice-direction-hint">👈 SOLA KAYDIR</span>
+                <span id="leftChoiceText">---</span>
+            </div>
+            <div class="choice-side-box right-side" id="rightChoiceBox">
+                <span class="choice-direction-hint">SAĞA KAYDIR 👉</span>
+                <span id="rightChoiceText">---</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- EKRAN 4: AKADEMİK SON ANKET -->
+    <div class="screen" id="screenSurvey">
+        <div class="modal-card">
+            <h2>Simülasyon Tamamlandı</h2>
+            <div style="display:flex; justify-content:space-around; background:#141417; padding:10px; border-radius:8px; margin-bottom:14px; font-size:0.85rem; text-align:center;">
+                <div>🏆 Şirket Skoru<br><strong id="finalCompanyScore" style="color:var(--brand-amber); font-size:1.05rem;">1000</strong></div>
+                <div>💥 Toplam Kriz<br><strong id="finalCrisisCount" style="color:var(--crisis-red); font-size:1.05rem;">0</strong></div>
+                <div>📊 Sağlık Ort.<br><strong id="finalHealthScore" style="color:#8b9bb4; font-size:1.05rem;">50</strong>/100</div>
+            </div>
+
+            <!-- Soru 1: YZ Aşinalığı / Kullanım Sıklığı -->
+            <div class="survey-item">
+                <label><span class="q-num">1. </span>Üretken yapay zekâ araçlarını (ChatGPT vb.) karar alma veya problem çözme süreçlerinizde ne sıklıkla kullanıyorsunuz? (1: Hiç, 5: Çok Sık)</label>
+                <div class="likert-row" data-q="q1_ai_freq">
+                    <button type="button" class="likert-btn" data-val="1">1</button>
+                    <button type="button" class="likert-btn" data-val="2">2</button>
+                    <button type="button" class="likert-btn" data-val="3">3</button>
+                    <button type="button" class="likert-btn" data-val="4">4</button>
+                    <button type="button" class="likert-btn" data-val="5">5</button>
+                </div>
+            </div>
+
+            <!-- Soru 2: Karar Öz-Yeterliği (Self-Confidence) -->
+            <div class="survey-item">
+                <label><span class="q-num">2. </span>Simülasyon sırasındaki kriz kararlarında kendi teknik muhakemenize (kararlarınıza) ne ölçüde güvendiniz? (1: Hiç, 5: Tamamen)</label>
+                <div class="likert-row" data-q="q2_self_conf">
+                    <button type="button" class="likert-btn" data-val="1">1</button>
+                    <button type="button" class="likert-btn" data-val="2">2</button>
+                    <button type="button" class="likert-btn" data-val="3">3</button>
+                    <button type="button" class="likert-btn" data-val="4">4</button>
+                    <button type="button" class="likert-btn" data-val="5">5</button>
+                </div>
+            </div>
+
+            <!-- Soru 3 (Sadece A Grubu): Algılanan YZ Güveni (Perceived Trust) -->
+            <div class="survey-item" id="surveyItemAiTrust">
+                <label><span class="q-num">3. </span>Simülasyon boyunca sunulan "YZ Önerisi" tavsiyelerinin doğruluğuna ve güvenilirliğine ne ölçüde güvendiniz? (1: Hiç, 5: Tamamen)</label>
+                <div class="likert-row" data-q="q3_ai_trust">
+                    <button type="button" class="likert-btn" data-val="1">1</button>
+                    <button type="button" class="likert-btn" data-val="2">2</button>
+                    <button type="button" class="likert-btn" data-val="3">3</button>
+                    <button type="button" class="likert-btn" data-val="4">4</button>
+                    <button type="button" class="likert-btn" data-val="5">5</button>
+                </div>
+            </div>
+
+            <!-- Soru 4 (Sadece A Grubu): Doğrulama Çabası / Bilişsel Yük Devri (Cognitive Offloading) -->
+            <div class="survey-item" id="surveyItemAiOffload">
+                <label><span class="q-num">4. </span>Karar verirken YZ önerisini kendi mantığınızla sorgulamak yerine doğrudan öneriye uymayı ne sıklıkla tercih ettiniz? (1: Hep Kendim Doğruladım, 5: Doğrudan YZ'ye Uydum)</label>
+                <div class="likert-row" data-q="q4_ai_offload">
+                    <button type="button" class="likert-btn" data-val="1">1</button>
+                    <button type="button" class="likert-btn" data-val="2">2</button>
+                    <button type="button" class="likert-btn" data-val="3">3</button>
+                    <button type="button" class="likert-btn" data-val="4">4</button>
+                    <button type="button" class="likert-btn" data-val="5">5</button>
+                </div>
+            </div>
+
+            <!-- Soru 5: NASA-TLX Zihinsel Talep (Mental Demand / Cognitive Load) -->
+            <div class="survey-item">
+                <label><span class="q-num">5. </span>Simülasyon sırasında 4 farklı şirket parametresini aynı anda dengede tutmaya çalışmak zihinsel olarak ne kadar yorucuydu? (1: Çok Düşük, 5: Çok Yüksek)</label>
+                <div class="likert-row" data-q="q5_nasa_tlx">
+                    <button type="button" class="likert-btn" data-val="1">1</button>
+                    <button type="button" class="likert-btn" data-val="2">2</button>
+                    <button type="button" class="likert-btn" data-val="3">3</button>
+                    <button type="button" class="likert-btn" data-val="4">4</button>
+                    <button type="button" class="likert-btn" data-val="5">5</button>
+                </div>
+            </div>
+
+            <!-- Soru 6: Alan Uzmanlığı (Domain Expertise) -->
+            <div class="survey-item">
+                <label><span class="q-num">6. </span>Siber güvenlik ve yazılım altyapısı yönetimi konusunda bilgi düzeyinizi nasıl değerlendirirsiniz? (1: Çok Başlangıç, 5: Çok İleri)</label>
+                <div class="likert-row" data-q="q6_cyber_know">
+                    <button type="button" class="likert-btn" data-val="1">1</button>
+                    <button type="button" class="likert-btn" data-val="2">2</button>
+                    <button type="button" class="likert-btn" data-val="3">3</button>
+                    <button type="button" class="likert-btn" data-val="4">4</button>
+                    <button type="button" class="likert-btn" data-val="5">5</button>
+                </div>
+            </div>
+
+            <!-- Soru 7: Bölüm -->
+            <div class="survey-item">
+                <label><span class="q-num">7. </span>Bölümünüz:</label>
+                <div class="likert-row" data-q="q7_department">
+                    <button type="button" class="likert-btn" data-val="Yazilim_Muh" style="font-size:0.78rem;">Yazılım Müh.</button>
+                    <button type="button" class="likert-btn" data-val="Bilgisayar_Muh" style="font-size:0.78rem;">Bilgisayar Müh.</button>
+                    <button type="button" class="likert-btn" data-val="Diger" style="font-size:0.78rem;">Diğer</button>
+                </div>
+            </div>
+
+            <!-- Soru 8: Sınıf -->
+            <div class="survey-item">
+                <label><span class="q-num">8. </span>Sınıfınız:</label>
+                <div class="likert-row" data-q="q8_class_year">
+                    <button type="button" class="likert-btn" data-val="1">1. Sınıf</button>
+                    <button type="button" class="likert-btn" data-val="2">2. Sınıf</button>
+                    <button type="button" class="likert-btn" data-val="3">3. Sınıf</button>
+                    <button type="button" class="likert-btn" data-val="4">4. Sınıf</button>
+                </div>
+            </div>
+
+            <button type="button" class="btn-primary" id="btnSubmitSurvey">Kaydet ve Bilgilendirmeyi Gör</button>
+        </div>
+    </div>
+
+    <!-- EKRAN 5: DEBRIEF -->
+    <div class="screen" id="screenDebrief">
+        <div class="modal-card">
+            <h2>Araştırma Bilgilendirmesi (Debriefing)</h2>
+            <div id="debriefGroupA" style="display:none;">
+                <p>Katılımınız için teşekkür ederiz! Bu araştırmanın amacı, çok parametreli kriz anlarında <strong>Otomasyon Yanlılığını (Automation Bias)</strong> — yani insanların yapay zekâ tavsiyelerine ne ölçüde uyduğunu — incelemekti.</p>
+                <p><strong>Önemli Açıklama:</strong> Simülasyon sırasında kartların altında gördüğünüz <em>"🤖 YZ Önerisi"</em> metinleri gerçek zamanlı bir yapay zekâ modeli tarafından değil, deneysel kontrol sağlamak amacıyla <strong>araştırmacı tarafından önceden yazılmış sabit metinlerden (Wizard of Oz / Oracle protokolü)</strong> oluşmaktaydı ve bazı kartlarda kasıtlı olarak hatalı (tuzak) yönlendirmeler içermekteydi.</p>
+                <p>Yanıtlarınız tamamen anonim olarak kaydedilmiştir.</p>
+            </div>
+            <div id="debriefGroupB" style="display:none;">
+                <p>Katılımınız için teşekkür ederiz! Bu araştırmanın amacı, çok parametreli kriz anlarında insanların kendi başlarına verdikleri kararlar ile yapay zekâ tavsiyesi eşliğinde verdikleri kararları karşılaştırmaktı.</p>
+                <p><strong>Önemli Açıklama:</strong> Siz bu çalışmanın <strong>Kontrol Grubunda (B Grubu)</strong> yer aldığınız için kartlarda herhangi bir tavsiye kutusu görmediniz. Diğer deney grubundaki (A Grubu) katılımcılara ise araştırmacı tarafından önceden kurgulanmış sabit "YZ Önerisi" metinleri gösterilerek tavsiye uyumu ölçülmüştür.</p>
+                <p>Yanıtlarınız tamamen anonim olarak kaydedilmiştir.</p>
+            </div>
+            <p id="queueFinalStatus" style="font-size:0.8rem; color:#4caf50; margin-top:12px;">✓ Tüm verileriniz başarıyla kaydedildi. Sayfayı kapatabilirsiniz.</p>
+        </div>
+    </div>
+
+    <!-- Kart Verisi -->
+    <script src="cards.js"></script>
+
+    <script>
+        const ACTIVE_CARDS = (typeof CARDS !== 'undefined' && Array.isArray(CARDS)) ? CARDS : [
+            {
+                id: 1, character: "Altyapı Mühendisi", emoji: "🖥️",
+                text: "cards.js dosyası bulunamadı, yedek kart gösteriliyor. Kampanya gecesi sunucu trafiği 3 katına çıktı, ek sunucu kiralayalım mı?",
+                ai_text: "🤖 YZ Önerisi: Çökmeyi önlemek için Kabul Etmek mevcut durumdaki en iyi seçenek.",
+                left: { text: "Reddet, Kiralama", effects: { budget: 6, security: 0, performance: -24, satisfaction: -20 } },
+                right: { text: "Kabul Et, Sunucu Kirala", effects: { budget: -14, security: -4, performance: 14, satisfaction: 8 } }
+            }
+        ];
+        const ACTIVE_ORDER_1 = (typeof ORDER_1 !== 'undefined') ? ORDER_1 : ACTIVE_CARDS.map(c => c.id);
+        const ACTIVE_ORDER_2 = (typeof ORDER_2 !== 'undefined') ? ORDER_2 : [...ACTIVE_ORDER_1].reverse();
+
+        const CONFIG = {
+            ENDPOINT: "https://script.google.com/macros/s/AKfycbx9senAF2h5DeLJQFGyykkv-00pu90zR4l_weztOHAgobCIF8LylopoBLUOb38XEgEv/exec",
+            SWIPE_THRESHOLD: 90,
+            NEUTRAL_ACCENT: "#7c8ba1",
+            DEFAULT_BORDER: "#323238"
+        };
+
+        /**
+         * 0. SENTETİK SES EFEKTLERİ MOTORU (Kart Sesi 2 Kat Güçlendirildi)
+         */
+        const SoundFX = (function() {
+            let ctx = null;
+
+            function getContext() {
+                if (!ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) ctx = new AudioCtx();
+                }
+                if (ctx && ctx.state === 'suspended') {
+                    ctx.resume().catch(() => {});
+                }
+                return ctx;
+            }
+
+            function playSwipeSound() {
+                const audio = getContext();
+                if (!audio) return;
+                try {
+                    const now = audio.currentTime;
+
+                    const bufferSize = Math.floor(audio.sampleRate * 0.11);
+                    const noiseBuffer = audio.createBuffer(1, bufferSize, audio.sampleRate);
+                    const output = noiseBuffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        output[i] = (Math.random() * 2 - 1) * Math.sin((i / bufferSize) * Math.PI);
+                    }
+
+                    const whiteNoise = audio.createBufferSource();
+                    whiteNoise.buffer = noiseBuffer;
+
+                    const filter = audio.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.setValueAtTime(720, now);
+                    filter.Q.setValueAtTime(1.4, now);
+
+                    const noiseGain = audio.createGain();
+                    noiseGain.gain.setValueAtTime(0.02, now);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.34, now + 0.035);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+                    whiteNoise.connect(filter);
+                    filter.connect(noiseGain);
+                    noiseGain.connect(audio.destination);
+                    whiteNoise.start(now);
+                    whiteNoise.stop(now + 0.11);
+
+                    const punchOsc = audio.createOscillator();
+                    const punchGain = audio.createGain();
+                    punchOsc.type = 'sine';
+                    punchOsc.frequency.setValueAtTime(190, now);
+                    punchOsc.frequency.exponentialRampToValueAtTime(75, now + 0.08);
+
+                    punchGain.gain.setValueAtTime(0.24, now);
+                    punchGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+                    punchOsc.connect(punchGain);
+                    punchGain.connect(audio.destination);
+                    punchOsc.start(now);
+                    punchOsc.stop(now + 0.085);
+                } catch (e) {}
+            }
+
+            function playCrisisSound() {
+                const audio = getContext();
+                if (!audio) return;
+                try {
+                    const now = audio.currentTime;
+                    const osc = audio.createOscillator();
+                    const gain = audio.createGain();
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(420, now);
+                    osc.frequency.setValueAtTime(290, now + 0.14);
+
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
+                    gain.gain.setValueAtTime(0.18, now + 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+
+                    osc.connect(gain);
+                    gain.connect(audio.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } catch (e) {}
+            }
+
+            return { playSwipeSound, playCrisisSound };
+        })();
+
+        /**
+         * 1. ONAY EKRANI ETKİLEŞİMİ
+         */
+        const consentCheckbox = document.getElementById('consentCheckbox');
+        const btnConsentNext = document.getElementById('btnConsentNext');
+
+        function syncConsentButtonState() {
+            btnConsentNext.disabled = !consentCheckbox.checked;
+        }
+        consentCheckbox.addEventListener('change', syncConsentButtonState);
+        consentCheckbox.addEventListener('input', syncConsentButtonState);
+        syncConsentButtonState();
+
+        /**
+         * 2. OTURUM VE DURUM KURTARMA (sessionStorage)
+         */
+        function loadOrInitSession() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const forcedGroup = urlParams.get('g');
+
+            let group = sessionStorage.getItem('exp_group');
+            if (forcedGroup === 'A' || forcedGroup === 'B') {
+                group = forcedGroup;
+                sessionStorage.setItem('exp_group', group);
+            } else if (!group) {
+                group = Math.random() < 0.5 ? 'A' : 'B';
+                sessionStorage.setItem('exp_group', group);
+            }
+
+            let participantCode = sessionStorage.getItem('exp_pcode');
+            if (!participantCode) {
+                const randNum = Math.floor(1000 + Math.random() * 9000);
+                participantCode = `P-${randNum}`;
+                sessionStorage.setItem('exp_pcode', participantCode);
+            }
+
+            let orderId = sessionStorage.getItem('exp_order_id');
+            if (!orderId) {
+                orderId = Math.random() < 0.5 ? '1' : '2';
+                sessionStorage.setItem('exp_order_id', orderId);
+            }
+
+            return { group, participantCode, orderId: parseInt(orderId, 10) };
+        }
+
+        const SESSION = loadOrInitSession();
+
+        // B Grubu (Kontrol) ise YZ ile ilgili anket sorularını kaldır ve kalan soruları 1..6 olarak yeniden numaralandır
+        if (SESSION.group === 'B') {
+            const aiTrustNode = document.getElementById('surveyItemAiTrust');
+            const aiOffloadNode = document.getElementById('surveyItemAiOffload');
+            if (aiTrustNode) aiTrustNode.remove();
+            if (aiOffloadNode) aiOffloadNode.remove();
+
+            document.querySelectorAll('#screenSurvey .survey-item .q-num').forEach((el, idx) => {
+                el.innerText = `${idx + 1}. `;
+            });
+        }
+
+        const activeOrder = SESSION.orderId === 1 ? ACTIVE_ORDER_1 : ACTIVE_ORDER_2;
+        const cardMap = new Map(ACTIVE_CARDS.map(c => [c.id, c]));
+
+        let state = { budget: 50, security: 50, performance: 50, satisfaction: 50 };
+        let companyScore = 1000;
+        let crisisCount = 0;
+        let currentIndex = 0;
+        let isResumedCard = false;
+        let savedPhase = sessionStorage.getItem('exp_phase') || 'screenConsent';
+
+        const savedStateRaw = sessionStorage.getItem('exp_bars');
+        if (savedStateRaw) {
+            try { state = JSON.parse(savedStateRaw); } catch (e) {}
+        }
+
+        const savedScoreRaw = sessionStorage.getItem('exp_score');
+        if (savedScoreRaw !== null) {
+            companyScore = parseInt(savedScoreRaw, 10);
+            if (isNaN(companyScore)) companyScore = 1000;
+        }
+
+        const savedCrisisRaw = sessionStorage.getItem('exp_crisis_count');
+        if (savedCrisisRaw !== null) {
+            crisisCount = parseInt(savedCrisisRaw, 10) || 0;
+        }
+
+        const savedIdxRaw = sessionStorage.getItem('exp_current_index');
+        if (savedIdxRaw !== null) {
+            currentIndex = parseInt(savedIdxRaw, 10) || 0;
+        }
+
+        if (savedPhase === 'screenGame') {
+            isResumedCard = true;
+        }
+
+        function saveProgress(phaseName) {
+            if (phaseName) {
+                savedPhase = phaseName;
+                sessionStorage.setItem('exp_phase', phaseName);
+            }
+            sessionStorage.setItem('exp_bars', JSON.stringify(state));
+            sessionStorage.setItem('exp_score', String(companyScore));
+            sessionStorage.setItem('exp_crisis_count', String(crisisCount));
+            sessionStorage.setItem('exp_current_index', String(currentIndex));
+        }
+
+        let cardShownAt = 0;
+        let isDragging = false;
+        let isAnimating = false;
+        let startX = 0;
+        let currentX = 0;
+
+        const barResetTimers = {};
+        const barCleanupTimers = {};
+        const pendingResetBars = new Set();
+        let globalToastTimer = null;
+
+        /**
+         * 3. TEKİLLEŞTİRİLMİŞ VERİ KUYRUĞU
+         */
+        function getQueue() {
+            try { return JSON.parse(sessionStorage.getItem('exp_queue') || '[]'); }
+            catch (e) { return []; }
+        }
+
+        function getSentIds() {
+            try { return JSON.parse(sessionStorage.getItem('exp_sent_ids') || '[]'); }
+            catch (e) { return []; }
+        }
+
+        function markIdAsSent(recordId) {
+            const sent = getSentIds();
+            if (!sent.includes(recordId)) {
+                sent.push(recordId);
+                sessionStorage.setItem('exp_sent_ids', JSON.stringify(sent));
+            }
+        }
+
+        function saveQueue(q) {
+            sessionStorage.setItem('exp_queue', JSON.stringify(q));
+            updateSyncIndicator(q.length);
+        }
+
+        function updateSyncIndicator(pendingCount) {
+            const finalStatus = document.getElementById('queueFinalStatus');
+            if (!finalStatus) return;
+            if (pendingCount > 0) {
+                finalStatus.style.color = '#ff9800';
+                finalStatus.innerText = `⏳ Gönderilmeyi bekleyen ${pendingCount} kayıt var, bağlantı kurulduğunda otomatik iletilecek...`;
+            } else {
+                finalStatus.style.color = '#4caf50';
+                finalStatus.innerText = '✓ Tüm verileriniz başarıyla kaydedildi. Sayfayı kapatabilirsiniz.';
+            }
+        }
+
+        function enqueueRecord(payload) {
+            const deterministicSuffix = payload.record_type === "decision" ? `pos_${payload.position}` : "survey_end";
+            const recordId = `${SESSION.participantCode}_${payload.record_type}_${deterministicSuffix}`;
+
+            const sentIds = getSentIds();
+            const q = getQueue();
+
+            if (sentIds.includes(recordId) || q.some(item => item.record_id === recordId)) {
+                return;
+            }
+
+            const record = { record_id: recordId, ...payload };
+            q.push(record);
+            saveQueue(q);
+            flushQueue();
+        }
+
+        let isFlushing = false;
+        async function flushQueue() {
+            if (isFlushing) return;
+            const q = getQueue();
+            updateSyncIndicator(q.length);
+            if (!CONFIG.ENDPOINT || CONFIG.ENDPOINT.includes("BURAYA_GOOGLE")) return;
+
+            isFlushing = true;
+            while (q.length > 0) {
+                const item = q[0];
+                try {
+                    const res = await fetch(CONFIG.ENDPOINT, {
+                        method: "POST",
+                        headers: { "Content-Type": "text/plain;charset=utf-8" },
+                        body: JSON.stringify(item)
+                    });
+                    if (res.ok) {
+                        markIdAsSent(item.record_id);
+                        q.shift();
+                        saveQueue(q);
+                    } else {
+                        break;
+                    }
+                } catch (err) {
+                    break;
+                }
+            }
+            isFlushing = false;
+        }
+
+        window.addEventListener('online', flushQueue);
+        setInterval(flushQueue, 8000);
+
+        /**
+         * 4. EKRAN GEÇİŞLERİ
+         */
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            saveProgress(screenId);
+        }
+
+        btnConsentNext.addEventListener('click', () => {
+            if (!consentCheckbox.checked) return;
+            showScreen('screenIntro');
+        });
+
+        document.getElementById('btnStartGame').addEventListener('click', () => {
+            if (!sessionStorage.getItem('exp_started_at_iso')) {
+                sessionStorage.setItem('exp_started_at_iso', String(Date.now()));
+            }
+            showScreen('screenGame');
+            updateBarUI();
+            updateScoreAndCrisisUI();
+            renderCurrentCard();
+        });
+
+        /**
+         * 5. KART, BAR, SKOR VE KRİZ MOTORU
+         */
+        const cardEl = document.getElementById('gameCard');
+        const leftChoiceBox = document.getElementById('leftChoiceBox');
+        const rightChoiceBox = document.getElementById('rightChoiceBox');
+        const leftChoiceText = document.getElementById('leftChoiceText');
+        const rightChoiceText = document.getElementById('rightChoiceText');
+        const aiSlot = document.getElementById('aiSlot');
+        const companyScoreLabel = document.getElementById('companyScoreLabel');
+        const crisisCountLabel = document.getElementById('crisisCountLabel');
+        const crisisBox = document.getElementById('crisisBox');
+        const crisisToast = document.getElementById('crisisToast');
+        const scoreDeltaBadge = document.getElementById('scoreDeltaBadge');
+
+        function clamp(val, min, max) {
+            return Math.max(min, Math.min(max, val));
+        }
+
+        function updateScoreAndCrisisUI(delta = null) {
+            companyScoreLabel.innerText = companyScore;
+            crisisCountLabel.innerText = crisisCount;
+
+            if (delta !== null) {
+                scoreDeltaBadge.className = 'score-delta';
+                void scoreDeltaBadge.offsetWidth;
+                if (delta >= 0) {
+                    scoreDeltaBadge.innerText = `+${delta}`;
+                    scoreDeltaBadge.classList.add('show-gain');
+                } else {
+                    scoreDeltaBadge.innerText = `${delta}`;
+                    scoreDeltaBadge.classList.add('show-loss');
+                }
+                setTimeout(() => {
+                    scoreDeltaBadge.className = 'score-delta';
+                }, 1400);
+            }
+        }
+
+        function updateBarUI() {
+            ['budget', 'security', 'performance', 'satisfaction'].forEach(k => {
+                const val = state[k];
+                const fill = document.getElementById(`bar-${k}`);
+                fill.style.width = `${val}%`;
+            });
+        }
+
+        function clearImpactDots() {
+            ['budget', 'security', 'performance', 'satisfaction'].forEach(k => {
+                document.getElementById(`dot-${k}`).className = 'impact-dot';
+            });
+        }
+
+        function showImpactDots(effects) {
+            ['budget', 'security', 'performance', 'satisfaction'].forEach(k => {
+                const dot = document.getElementById(`dot-${k}`);
+                const absVal = Math.abs(effects[k] || 0);
+                if (absVal === 0) {
+                    dot.className = 'impact-dot';
+                } else if (absVal < 15) {
+                    dot.className = 'impact-dot small';
+                } else {
+                    dot.className = 'impact-dot large';
+                }
+            });
+        }
+
+        function resetChoiceBoxesHighlight() {
+            leftChoiceBox.classList.remove('active-choice', 'dimmed-choice');
+            rightChoiceBox.classList.remove('active-choice', 'dimmed-choice');
+        }
+
+        function renderCurrentCard() {
+            if (currentIndex >= activeOrder.length) {
+                finishGame();
+                return;
+            }
+
+            const cardId = activeOrder[currentIndex];
+            const cardData = cardMap.get(cardId);
+
+            document.getElementById('progressLabel').innerText = `Kart: ${currentIndex + 1} / ${activeOrder.length}`;
+            document.getElementById('cardCharacter').innerText = `${cardData.emoji} ${cardData.character}`;
+            document.getElementById('cardText').innerText = `"${cardData.text}"`;
+
+            leftChoiceText.innerText = cardData.left.text;
+            rightChoiceText.innerText = cardData.right.text;
+            resetChoiceBoxesHighlight();
+
+            aiSlot.innerHTML = '';
+            if (SESSION.group === 'A' && cardData.ai_text) {
+                const aiDiv = document.createElement('div');
+                aiDiv.className = 'ai-box';
+                aiDiv.innerText = cardData.ai_text;
+                aiSlot.appendChild(aiDiv);
+            }
+
+            clearImpactDots();
+            cardShownAt = performance.now();
+            isAnimating = false;
+        }
+
+        /**
+         * 6. POINTER EVENTS SÜRÜKLEME SİSTEMİ
+         */
+        cardEl.addEventListener('pointerdown', (e) => {
+            if (isAnimating) return;
+            isDragging = true;
+            startX = e.clientX;
+            currentX = 0;
+            cardEl.setPointerCapture(e.pointerId);
+            cardEl.style.transition = 'none';
+        });
+
+        cardEl.addEventListener('pointermove', (e) => {
+            if (!isDragging || isAnimating) return;
+            currentX = e.clientX - startX;
+            const rotateAngle = currentX * 0.07;
+            cardEl.style.transform = `translateX(${currentX}px) rotate(${rotateAngle}deg)`;
+
+            const cardData = cardMap.get(activeOrder[currentIndex]);
+            if (!cardData) return;
+
+            if (currentX > 12) {
+                cardEl.style.borderColor = CONFIG.NEUTRAL_ACCENT;
+                cardEl.style.boxShadow = "0 15px 35px rgba(124, 139, 161, 0.28)";
+                rightChoiceBox.classList.add('active-choice');
+                rightChoiceBox.classList.remove('dimmed-choice');
+                leftChoiceBox.classList.add('dimmed-choice');
+                leftChoiceBox.classList.remove('active-choice');
+                showImpactDots(cardData.right.effects);
+            } else if (currentX < -12) {
+                cardEl.style.borderColor = CONFIG.NEUTRAL_ACCENT;
+                cardEl.style.boxShadow = "0 15px 35px rgba(124, 139, 161, 0.28)";
+                leftChoiceBox.classList.add('active-choice');
+                leftChoiceBox.classList.remove('dimmed-choice');
+                rightChoiceBox.classList.add('dimmed-choice');
+                rightChoiceBox.classList.remove('active-choice');
+                showImpactDots(cardData.left.effects);
+            } else {
+                resetCardVisuals();
+            }
+        });
+
+        function handlePointerEnd() {
+            if (!isDragging || isAnimating) return;
+            isDragging = false;
+
+            if (currentX > CONFIG.SWIPE_THRESHOLD) {
+                commitSwipe('right', 380);
+            } else if (currentX < -CONFIG.SWIPE_THRESHOLD) {
+                commitSwipe('left', -380);
+            } else {
+                cardEl.style.transition = 'transform 0.2s ease, border-color 0.15s ease';
+                cardEl.style.transform = 'translateX(0px) rotate(0deg)';
+                resetCardVisuals();
+            }
+            currentX = 0;
+        }
+
+        cardEl.addEventListener('pointerup', handlePointerEnd);
+        cardEl.addEventListener('pointercancel', handlePointerEnd);
+
+        function resetCardVisuals() {
+            cardEl.style.borderColor = CONFIG.DEFAULT_BORDER;
+            cardEl.style.boxShadow = "0 15px 35px rgba(0,0,0,0.6)";
+            resetChoiceBoxesHighlight();
+            clearImpactDots();
+        }
+
+        function commitSwipe(direction, targetX) {
+            isAnimating = true;
+            const responseMs = Math.round(performance.now() - cardShownAt);
+            const cardData = cardMap.get(activeOrder[currentIndex]);
+            const chosenBranch = direction === 'right' ? cardData.right : cardData.left;
+
+            SoundFX.playSwipeSound();
+
+            clearImpactDots();
+            resetChoiceBoxesHighlight();
+
+            const rotateOut = targetX * 0.08;
+            cardEl.style.transition = 'transform 0.26s ease-out, opacity 0.26s ease-out';
+            cardEl.style.transform = `translateX(${targetX}px) rotate(${rotateOut}deg)`;
+            cardEl.style.opacity = '0';
+
+            setTimeout(() => {
+                const keys = ['budget', 'security', 'performance', 'satisfaction'];
+                const crashedKeys = [];
+
+                // Sadece bar 0'a düştüğünde kriz tetiklenir (100 güvenli üst tavandır)
+                keys.forEach(k => {
+                    if (pendingResetBars.has(k)) {
+                        if (barResetTimers[k]) clearTimeout(barResetTimers[k]);
+                        state[k] = 50;
+                        pendingResetBars.delete(k);
+                    }
+                    document.getElementById(`bar-${k}`).classList.remove('crisis-slow-reset');
+                    state[k] = clamp(state[k] + (chosenBranch.effects[k] || 0), 0, 100);
+                    if (state[k] === 0) {
+                        crashedKeys.push(k);
+                    }
+                });
+
+                updateBarUI();
+
+                let turnScoreDelta = 10;
+                const crisisTriggeredThisTurn = crashedKeys.length > 0;
+
+                if (crisisTriggeredThisTurn) {
+                    SoundFX.playCrisisSound();
+
+                    const penalty = crashedKeys.length * 100;
+                    turnScoreDelta -= penalty;
+                    crisisCount += crashedKeys.length;
+
+                    crisisBox.classList.remove('crisis-active');
+                    void crisisBox.offsetWidth;
+                    crisisBox.classList.add('crisis-active');
+
+                    crisisToast.innerText = `⚠️ KRİZ! Bar 0'a düştü, Yönetim Kurulu müdahale etti (-${penalty} Puan, Bar 50'ye çekildi)`;
+                    crisisToast.classList.add('visible');
+
+                    if (globalToastTimer) clearTimeout(globalToastTimer);
+                    globalToastTimer = setTimeout(() => {
+                        crisisToast.classList.remove('visible');
+                        crisisBox.classList.remove('crisis-active');
+                    }, 2800);
+
+                    crashedKeys.forEach(k => {
+                        const box = document.getElementById(`box-${k}`);
+                        const fillEl = document.getElementById(`bar-${k}`);
+
+                        if (barResetTimers[k]) clearTimeout(barResetTimers[k]);
+                        if (barCleanupTimers[k]) clearTimeout(barCleanupTimers[k]);
+
+                        box.classList.remove('boundary-hit');
+                        void box.offsetWidth;
+                        box.classList.add('boundary-hit');
+
+                        pendingResetBars.add(k);
+
+                        barResetTimers[k] = setTimeout(() => {
+                            pendingResetBars.delete(k);
+                            fillEl.classList.add('crisis-slow-reset');
+                            state[k] = 50;
+                            fillEl.style.width = '50%';
+                            saveProgress('screenGame');
+                        }, 650);
+
+                        barCleanupTimers[k] = setTimeout(() => {
+                            box.classList.remove('boundary-hit');
+                            fillEl.classList.remove('crisis-slow-reset');
+                            delete barCleanupTimers[k];
+                        }, 2800);
+                    });
+                }
+
+                companyScore += turnScoreDelta;
+                updateScoreAndCrisisUI(turnScoreDelta);
+
+                const rawBarsForLog = { ...state };
+                const decisionPosition = currentIndex + 1;
+                const wasResumed = isResumedCard;
+                isResumedCard = false;
+
+                currentIndex++;
+                saveProgress('screenGame');
+
+                enqueueRecord({
+                    record_type: "decision",
+                    participant_code: SESSION.participantCode,
+                    group: SESSION.group,
+                    order_id: SESSION.orderId,
+                    card_id: cardData.id,
+                    position: decisionPosition,
+                    choice: direction,
+                    response_ms: responseMs,
+                    resumed: wasResumed,
+                    timestamp: new Date().toISOString(),
+                    bar_budget: rawBarsForLog.budget,
+                    bar_security: rawBarsForLog.security,
+                    bar_performance: rawBarsForLog.performance,
+                    bar_satisfaction: rawBarsForLog.satisfaction,
+                    crisis_triggered: crisisTriggeredThisTurn,
+                    company_score: companyScore,
+                    crisis_count: crisisCount
+                });
+
+                cardEl.style.transition = 'none';
+                cardEl.style.transform = 'translateX(0px) rotate(0deg)';
+                cardEl.style.borderColor = CONFIG.DEFAULT_BORDER;
+                cardEl.style.boxShadow = "0 15px 35px rgba(0,0,0,0.6)";
+
+                renderCurrentCard();
+
+                requestAnimationFrame(() => {
+                    cardEl.style.transition = 'opacity 0.2s ease-in';
+                    cardEl.style.opacity = '1';
+                });
+            }, 270);
+        }
+
+        /**
+         * 7. OYUN SONU, AKADEMİK ANKET VE DEBRIEF
+         */
+        const surveyAnswers = {
+            q1_ai_freq: null,
+            q2_self_conf: null,
+            q3_ai_trust: SESSION.group === 'B' ? 'NA' : null,
+            q4_ai_offload: SESSION.group === 'B' ? 'NA' : null,
+            q5_nasa_tlx: null,
+            q6_cyber_know: null,
+            q7_department: null,
+            q8_class_year: null
+        };
+
+        document.querySelectorAll('.likert-row').forEach(row => {
+            const qKey = row.getAttribute('data-q');
+            row.querySelectorAll('.likert-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    row.querySelectorAll('.likert-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    const rawVal = btn.getAttribute('data-val');
+                    surveyAnswers[qKey] = isNaN(rawVal) ? rawVal : parseInt(rawVal, 10);
+                });
+            });
+        });
+
+        function finishGame() {
+            const avgHealth = Math.round((state.budget + state.security + state.performance + state.satisfaction) / 4);
+            document.getElementById('finalCompanyScore').innerText = companyScore;
+            document.getElementById('finalCrisisCount').innerText = crisisCount;
+            document.getElementById('finalHealthScore').innerText = avgHealth;
+            document.getElementById('progressLabel').innerText = "Tamamlandı";
+            showScreen('screenSurvey');
+        }
+
+        function activateDebriefView() {
+            if (SESSION.group === 'A') {
+                document.getElementById('debriefGroupA').style.display = 'block';
+            } else {
+                document.getElementById('debriefGroupB').style.display = 'block';
+            }
+            document.getElementById('progressLabel').innerText = "Tamamlandı";
+            showScreen('screenDebrief');
+        }
+
+        document.getElementById('btnSubmitSurvey').addEventListener('click', () => {
+            if (
+                !surveyAnswers.q1_ai_freq ||
+                !surveyAnswers.q2_self_conf ||
+                !surveyAnswers.q5_nasa_tlx ||
+                !surveyAnswers.q6_cyber_know ||
+                !surveyAnswers.q7_department ||
+                !surveyAnswers.q8_class_year ||
+                (SESSION.group === 'A' && (!surveyAnswers.q3_ai_trust || !surveyAnswers.q4_ai_offload))
+            ) {
+                alert("Lütfen devam etmeden önce tüm soruları yanıtlayın.");
+                return;
+            }
+
+            const startedMs = parseInt(sessionStorage.getItem('exp_started_at_iso') || String(Date.now()), 10);
+            const totalDurationMs = Math.max(0, Date.now() - startedMs);
+
+            enqueueRecord({
+                record_type: "survey_end",
+                participant_code: SESSION.participantCode,
+                group: SESSION.group,
+                order_id: SESSION.orderId,
+                consent: true,
+                total_duration_ms: totalDurationMs,
+                final_score: companyScore,
+                total_crises: crisisCount,
+                final_budget: state.budget,
+                final_security: state.security,
+                final_performance: state.performance,
+                final_satisfaction: state.satisfaction,
+                q1_ai_freq: surveyAnswers.q1_ai_freq,
+                q2_self_conf: surveyAnswers.q2_self_conf,
+                q3_ai_trust: surveyAnswers.q3_ai_trust,
+                q4_ai_offload: surveyAnswers.q4_ai_offload,
+                q5_nasa_tlx: surveyAnswers.q5_nasa_tlx,
+                q6_cyber_know: surveyAnswers.q6_cyber_know,
+                q7_department: surveyAnswers.q7_department,
+                q8_class_year: surveyAnswers.q8_class_year,
+                timestamp: new Date().toISOString()
+            });
+
+            activateDebriefView();
+        });
+
+        /**
+         * 8. BAŞLANGIÇTA SAYFA YENİLEME (F5) DURUMUNU YÜKLE
+         */
+        (function restoreSessionView() {
+            updateSyncIndicator(getQueue().length);
+            updateScoreAndCrisisUI();
+            if (savedPhase === 'screenIntro') {
+                showScreen('screenIntro');
+            } else if (savedPhase === 'screenGame') {
+                showScreen('screenGame');
+                updateBarUI();
+                renderCurrentCard();
+            } else if (savedPhase === 'screenSurvey') {
+                finishGame();
+            } else if (savedPhase === 'screenDebrief') {
+                activateDebriefView();
+            }
+            flushQueue();
+        })();
+    </script>
+</body>
+</html>
